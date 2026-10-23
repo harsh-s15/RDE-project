@@ -1,2 +1,12 @@
 node_modules/
 Agentic State-Traversal Tester Project Spec.md
+README.md
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Secrets
+.env

@@ -1,0 +1,8 @@
+# Order lifecycle: the single source of truth for routes.
+# Transitions must form one chain through `states` (checked on load).
+states: [CREATED, PAID, ALLOCATED, SHIPPED, DELIVERED]
+transitions:
+  - {id: pay,      from: CREATED,   to: PAID,      by: customer,  hint: "pay for the order"}
+  - {id: allocate, from: PAID,      to: ALLOCATED, by: system,    timeout_s: 5}
+  - {id: ship,     from: ALLOCATED, to: SHIPPED,   by: warehouse, hint: "mark the order shipped"}
+  - {id: deliver,  from: SHIPPED,   to: DELIVERED, by: courier,   hint: "mark the order delivered"}

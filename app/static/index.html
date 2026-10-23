@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Toy Shop</title>
+  <link rel="icon" href="data:,">
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 30rem; margin: 2rem auto; padding: 0 1rem; }
+    label, input { display: block; margin: .4rem 0; width: 100%; }
+    button { margin: .5rem .5rem 0 0; padding: .4rem .8rem; }
+    .badge { font-weight: bold; padding: .1rem .5rem; border-radius: 1rem; background: #e3ecff; }
+    [role=alert] { color: #a33; }
+  </style>
+</head>
+<body>
+  <!-- Plain buttons with visible text: the tester's agent works from accessible names, not ids. -->
+  <main id="customer" hidden>
+    <h1>Toy Shop</h1>
+    <form id="new-order">
+      <h2>New order</h2>
+      <label>Name <input name="customer_name" required></label>
+      <label>Email <input name="email" type="email" required></label>
+      <label>Phone <input name="phone" required></label>
+      <label>Address <input name="address" required></label>
+      <button type="submit">Place order</button>
+    </form>
+    <section id="card" hidden>
+      <h2>Your order</h2>
+      <p>Order ID: <span data-testid="order-id"></span></p>
+      <p>Status: <span data-testid="status" class="badge"></span></p>
+      <button id="pay">Pay now</button>
+    </section>
+    <p role="alert" id="msg"></p>
+  </main>
+  <main id="admin" hidden>
+    <h1>Warehouse and courier</h1>
+    <label>Order ID <input id="admin-order"></label>
+    <button data-action="ship">Mark shipped</button>
+    <button data-action="deliver">Mark delivered</button>
+    <p role="alert" id="admin-msg"></p>
+  </main>
+  <script>
+    const $ = s => document.querySelector(s);
+    const say = (sel, text) => { $(sel).textContent = text; };
+    let orderId = null;
+    async function api(method, path, body) {
+      const r = await fetch(path, { method, headers: { "Content-Type": "application/json" }, body: body && JSON.stringify(body) });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.detail || `HTTP ${r.status}`);
+      return data;
+    }
+    function showStatus(status) {
+      $("[data-testid=status]").textContent = status;
+      $("#pay").disabled = status !== "CREATED";
+    }
+    if (location.pathname === "/admin") {
+      $("#admin").hidden = false;
+      document.querySelectorAll("[data-action]").forEach(btn => btn.onclick = async () => {
+        try {
+          const o = await api("POST", `/api/orders/${$("#admin-order").value.trim()}/${btn.dataset.action}`);
+          say("#admin-msg", `Order ${o.id} is now ${o.status}`);
+        } catch (err) { say("#admin-msg", `Error: ${err.message}`); }
+      });
+    } else {
+      $("#customer").hidden = false;
+      $("#new-order").onsubmit = async e => {
+        e.preventDefault();
+        try {
+          const o = await api("POST", "/api/orders", Object.fromEntries(new FormData(e.target)));
+          orderId = o.id;
+          $("[data-testid=order-id]").textContent = o.id;
+          showStatus(o.status);
+          $("#new-order").hidden = true;
+          $("#card").hidden = false;
+          say("#msg", "Order placed");
+        } catch (err) { say("#msg", `Error: ${err.message}`); }
+      };
+      $("#pay").onclick = async () => {
+        try {
+          showStatus((await api("POST", `/api/orders/${orderId}/pay`)).status);
+          say("#msg", "Payment received, thank you!");
+        } catch (err) { say("#msg", `Error: ${err.message}`); }
+      };
+      // Poll the customer-facing status view every second.
+      setInterval(async () => { if (orderId) showStatus((await api("GET", `/api/orders/${orderId}/view`)).status); }, 1000);
+    }
+  </script>
+</body>
+</html>
